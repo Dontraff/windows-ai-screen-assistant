@@ -1,0 +1,294 @@
+<Window x:Class="ScreenAssistant.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Windows AI Screen Assistant" Language="ru-RU"
+        Width="1040" Height="760" MinWidth="700" MinHeight="530"
+        Background="#F4F6F9" Foreground="#19253B"
+        FontFamily="Segoe UI" FontSize="14" UseLayoutRounding="True">
+    <Window.Resources>
+        <SolidColorBrush x:Key="Line" Color="#D8DFE8"/>
+        <SolidColorBrush x:Key="Muted" Color="#4C5C73"/>
+        <SolidColorBrush x:Key="Accent" Color="#224FAD"/>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="12,7"/>
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+            <Setter Property="Foreground" Value="#19253B"/>
+        </Style>
+        <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{StaticResource Accent}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="4">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#193F91"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#153375"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Surface" Property="BorderBrush" Value="Black"/>
+                                <Setter TargetName="Surface" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Surface" Property="Background" Value="#E3E8F1"/>
+                                <Setter TargetName="Surface" Property="BorderBrush" Value="#D8DFE8"/>
+                                <Setter Property="Foreground" Value="#4C5C73"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Padding" Value="7,5"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="PasswordBox">
+            <Setter Property="Padding" Value="7,5"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="Label">
+            <Setter Property="Padding" Value="0,0,0,4"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#19253B"/>
+        </Style>
+        <Style x:Key="Section" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <DockPanel Margin="0,0,0,16" LastChildFill="True">
+            <Border DockPanel.Dock="Right" VerticalAlignment="Center" Padding="10,6"
+                    CornerRadius="4" Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse x:Name="CaptureLight" Width="8" Height="8" Fill="#68778D" Margin="0,0,7,0"/>
+                    <TextBlock x:Name="CaptureStatus" Text="Захват выключен" FontWeight="SemiBold"
+                               AutomationProperties.LiveSetting="Polite"/>
+                </StackPanel>
+            </Border>
+            <CheckBox x:Name="OverlayEnabled" DockPanel.Dock="Right" Content="Плавающий ответ"
+                      VerticalAlignment="Center" Margin="8,0,12,0"
+                      Checked="OverlayToggle_Changed" Unchecked="OverlayToggle_Changed"/>
+            <TextBlock Text="AI Screen Assistant" FontSize="27" FontWeight="SemiBold"/>
+        </DockPanel>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="14"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="9">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="13" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Section}" Text="Источник"/>
+                        <TextBlock x:Name="SourceText" Style="{StaticResource Hint}"
+                                   Text="Выберите монитор в системном окне." Margin="0,5,0,9"/>
+                        <UniformGrid Columns="2" Margin="0,0,0,12">
+                            <Button x:Name="PickButton" Content="Выбрать…" Click="Pick_Click" Margin="0,0,4,0"/>
+                            <Button x:Name="PreviewButton" Content="Снять кадр" Click="Preview_Click" Margin="4,0,0,0"
+                                    ToolTip="Сделать локальный кадр для предпросмотра"/>
+                        </UniformGrid>
+                        <StackPanel x:Name="SettingsPanel">
+                            <TextBlock Style="{StaticResource Section}" Text="AI Tunnel" Margin="0,0,0,8"/>
+                            <Label Target="{Binding ElementName=BaseUrl}" Content="Base URL"/>
+                            <TextBox x:Name="BaseUrl" TextChanged="BaseUrl_Changed" Margin="0,0,0,7"/>
+                            <Label Target="{Binding ElementName=ApiKey}" Content="API-ключ"/>
+                            <PasswordBox x:Name="ApiKey" Margin="0,0,0,7"/>
+                            <Label Target="{Binding ElementName=ModelId}" Content="Модель"/>
+                            <DockPanel Margin="0,0,0,9">
+                                <Button DockPanel.Dock="Right" Content="Каталог" Click="Catalog_Click" Margin="6,0,0,0"
+                                        ToolTip="Загрузить модели AI Tunnel с поддержкой изображений"/>
+                                <ComboBox x:Name="ModelId" IsEditable="True" IsTextSearchEnabled="False"
+                                          AutomationProperties.Name="ID модели" VerticalContentAlignment="Center"/>
+                            </DockPanel>
+                            <TextBlock Style="{StaticResource Section}" Text="Тренировка" Margin="0,1,0,8"/>
+                            <Grid Margin="0,0,0,9">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,4,0">
+                                    <Label Target="{Binding ElementName=Interval}" Content="Интервал, с"/>
+                                    <TextBox x:Name="Interval"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                    <Label Target="{Binding ElementName=Duration}" Content="Длительность, мин"/>
+                                    <TextBox x:Name="Duration"/>
+                                </StackPanel>
+                            </Grid>
+                            <CheckBox x:Name="SkipIdentical" Content="Пропускать одинаковые кадры" Margin="0,3,0,12"/>
+                            <CheckBox x:Name="UseStreaming" Content="Потоковые ответы" Margin="0,0,0,10"/>
+                            <Button Content="Сохранить настройки" Click="Save_Click"/>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0"
+                                   Text="При запуске API получит тестовую картинку, затем кадры выбранного источника."/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <Border Grid.Column="2" Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="9">
+                <Grid Margin="15">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="5*" MinHeight="88"/>
+                        <RowDefinition Height="7*" MinHeight="140"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Margin="0,0,0,8">
+                        <TextBlock x:Name="FrameDetails" DockPanel.Dock="Right" Style="{StaticResource Hint}"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Style="{StaticResource Section}" Text="Предпросмотр"/>
+                    </DockPanel>
+                    <Border Grid.Row="1" Background="#EEF2F7" BorderBrush="{StaticResource Line}"
+                            BorderThickness="1" CornerRadius="5" Padding="5" ClipToBounds="True">
+                        <Grid>
+                            <TextBlock x:Name="PreviewEmpty" Style="{StaticResource Hint}" Text="Кадр ещё не получен"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Image x:Name="PreviewImage" Stretch="Uniform"
+                                   AutomationProperties.Name="Последний захваченный кадр"
+                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Grid>
+                    </Border>
+                    <TabControl Grid.Row="2" Margin="0,13,0,0" BorderBrush="{StaticResource Line}">
+                        <TabItem Header="Последний ответ">
+                            <TextBox x:Name="AnswerText" Text="Ответ появится после первого анализа."
+                                     IsReadOnly="True" BorderThickness="0" Padding="10" VerticalContentAlignment="Top"
+                                     AutomationProperties.Name="Последний ответ модели"
+                                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+                        </TabItem>
+                        <TabItem Header="История">
+                            <Grid Margin="8">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" MinHeight="48"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock x:Name="HistoryEmpty" Style="{StaticResource Hint}"
+                                           Text="В этой сессии пока нет ответов." Margin="5" IsHitTestVisible="False"
+                                           Panel.ZIndex="1"/>
+                                <ListBox x:Name="HistoryList" DisplayMemberPath="Label" SelectionChanged="History_Changed"
+                                         AutomationProperties.Name="История ответов"/>
+                                <TextBox x:Name="HistoryText" Grid.Row="1" Margin="0,6,0,0" Padding="5"
+                                         IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top"
+                                         AutomationProperties.Name="Выбранный ответ из истории"/>
+                            </Grid>
+                        </TabItem>
+                        <TabItem Header="Оверлей">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <Grid x:Name="OverlayOptions" Margin="10">
+                                    <Grid.Resources>
+                                        <Style x:Key="Value" TargetType="TextBlock">
+                                            <Setter Property="Margin" Value="7,0,0,0"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                        </Style>
+                                        <Style x:Key="CompactHeightStyle" TargetType="FrameworkElement">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Compact}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                        <Style x:Key="DetailedHeightStyle" TargetType="FrameworkElement">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Compact}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Grid.Resources>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="46"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="32"/>
+                                        <RowDefinition Height="31"/>
+                                        <RowDefinition Height="31"/>
+                                        <RowDefinition Height="31"/>
+                                        <RowDefinition Height="31"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <CheckBox Grid.ColumnSpan="3" Content="Компактная строка" IsChecked="{Binding Compact}"
+                                              VerticalAlignment="Center"/>
+
+                                    <Label Grid.Row="1" Target="{Binding ElementName=OverlayWidth}" Content="Ширина"
+                                           VerticalAlignment="Center" Margin="0,0,9,0"/>
+                                    <Slider x:Name="OverlayWidth" Grid.Row="1" Grid.Column="1" Minimum="240" Maximum="1000"
+                                            TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Width}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="2" Style="{StaticResource Value}" Text="{Binding Width, StringFormat=F0}"/>
+
+                                    <TextBlock Grid.Row="2" Text="Высота" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,9,0"/>
+                                    <Slider Grid.Row="2" Grid.Column="1" Minimum="36" Maximum="72" TickFrequency="1"
+                                            IsSnapToTickEnabled="True" Value="{Binding CompactHeight}"
+                                            Style="{StaticResource CompactHeightStyle}" AutomationProperties.Name="Высота компактной строки"/>
+                                    <Slider Grid.Row="2" Grid.Column="1" Minimum="190" Maximum="560" TickFrequency="1"
+                                            IsSnapToTickEnabled="True" Value="{Binding Height}"
+                                            Style="{StaticResource DetailedHeightStyle}" AutomationProperties.Name="Высота многострочного окна"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="2" Style="{StaticResource Value}" Text="{Binding DisplayHeight, StringFormat=F0}"/>
+
+                                    <Label Grid.Row="3" Target="{Binding ElementName=OverlayFont}" Content="Размер шрифта"
+                                           VerticalAlignment="Center" Margin="0,0,9,0"/>
+                                    <Slider x:Name="OverlayFont" Grid.Row="3" Grid.Column="1" Minimum="12" Maximum="26"
+                                            TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding FontSize}"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="2" Style="{StaticResource Value}" Text="{Binding FontSize, StringFormat=F0}"/>
+
+                                    <Label Grid.Row="4" Target="{Binding ElementName=OverlayOpacity}" Content="Непрозрачность фона"
+                                           VerticalAlignment="Center" Margin="0,0,9,0"/>
+                                    <Slider x:Name="OverlayOpacity" Grid.Row="4" Grid.Column="1" Minimum="0" Maximum="1"
+                                            TickFrequency=".01" IsSnapToTickEnabled="True" Value="{Binding PanelOpacity}"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="2" Style="{StaticResource Value}" Text="{Binding PanelOpacity, StringFormat=P0}"/>
+
+                                    <Button Grid.Row="5" Grid.ColumnSpan="3" HorizontalAlignment="Left" Margin="0,7,0,0"
+                                            Content="Сбросить положение" Click="ResetOverlayPosition_Click"/>
+                                </Grid>
+                            </ScrollViewer>
+                        </TabItem>
+                    </TabControl>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1"
+                CornerRadius="9" Padding="12,9" Margin="0,13,0,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <Button x:Name="StartButton" Content="_Запустить" Style="{StaticResource Primary}" Click="Start_Click"
+                            MinWidth="106" Margin="0,0,6,0"/>
+                    <Button x:Name="StopButton" Content="_Остановить" Click="Stop_Click" MinWidth="106"/>
+                </StackPanel>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="StatusText" Text="Готово к настройке" FontWeight="SemiBold" TextWrapping="Wrap"
+                               AutomationProperties.LiveSetting="Polite"/>
+                    <TextBlock x:Name="StatsText" Style="{StaticResource Hint}" Margin="0,2,0,0"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>
