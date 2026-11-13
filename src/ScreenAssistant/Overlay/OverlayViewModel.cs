@@ -29,6 +29,18 @@ internal sealed class OverlayViewModel(OverlayPreferences preferences) : INotify
         }
     }
 
+    public bool ExcludeFromCapture
+    {
+        get => _preferences.ExcludeFromCapture;
+        set => SetAppearance(_preferences with { ExcludeFromCapture = value });
+    }
+
+    public bool SolidBackground
+    {
+        get => _preferences.SolidBackground;
+        set => SetAppearance(_preferences with { SolidBackground = value });
+    }
+
     public double CompactHeight
     {
         get => _preferences.CompactHeight;

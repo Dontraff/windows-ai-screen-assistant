@@ -92,6 +92,61 @@ public sealed class AiClientTests
     }
 
     [Fact]
+    public async Task DefaultsRetryAfterToThirtySecondsWhenHeaderIsMissing()
+    {
+        using var http = new HttpClient(new Handler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests))));
+        var error = await Assert.ThrowsAsync<AiException>(
+            () => new AiClient(http).AnalyzeAsync(Endpoint, "test-key", "vision", Frame, default));
+        Assert.Equal(TimeSpan.FromSeconds(30), error.RetryAfter);
+        Assert.False(error.RequiresConfigurationChange);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Redirect, true)]
+    [InlineData(HttpStatusCode.MovedPermanently, true)]
+    [InlineData(HttpStatusCode.BadRequest, true)]
+    [InlineData(HttpStatusCode.Unauthorized, true)]
+    [InlineData(HttpStatusCode.PaymentRequired, true)]
+    [InlineData(HttpStatusCode.Forbidden, true)]
+    [InlineData(HttpStatusCode.NotFound, true)]
+    [InlineData(HttpStatusCode.RequestTimeout, false)]
+    [InlineData(HttpStatusCode.TooManyRequests, false)]
+    [InlineData(HttpStatusCode.InternalServerError, false)]
+    public async Task ClassifiesConfigurationChangesByStatus(HttpStatusCode status, bool requiresChange)
+    {
+        using var http = new HttpClient(new Handler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(status))));
+        var error = await Assert.ThrowsAsync<AiException>(
+            () => new AiClient(http).AnalyzeAsync(Endpoint, "test-key", "vision", Frame, default));
+        Assert.Equal(requiresChange, error.RequiresConfigurationChange);
+        Assert.Equal(status, error.Status);
+    }
+
+    [Fact]
+    public async Task NormalizesBaseUriWithoutTrailingSlashForCompletionsPath()
+    {
+        using var http = new HttpClient(new Handler((request, _) =>
+        {
+            Assert.Equal("https://example.test/custom/v1/chat/completions", request.RequestUri!.AbsoluteUri);
+            return Task.FromResult(Json("""{"choices":[{"message":{"content":"ok"}}]}"""));
+        }));
+        var result = await new AiClient(http).AnalyzeAsync(
+            new Uri("https://example.test/custom/v1"), "test-key", "vision", Frame, default);
+        Assert.Equal("ok", result);
+    }
+
+    [Fact]
+    public async Task MapsIoExceptionsFromNonStreamingRequests()
+    {
+        using var http = new HttpClient(new Handler((_, _) => throw new IOException("reset")));
+        var error = await Assert.ThrowsAsync<AiException>(
+            () => new AiClient(http).AnalyzeAsync(Endpoint, "test-key", "vision", Frame, default));
+        Assert.Contains("Соединение с API прервалось", error.Message);
+        Assert.DoesNotContain("reset", error.ToString());
+    }
+
+    [Fact]
     public async Task KeepsProviderErrorBodiesOutOfExceptions()
     {
         using var http = new HttpClient(new Handler((_, _) => Task.FromResult(
@@ -127,6 +182,7 @@ public sealed class AiClientTests
     [InlineData("http://example.test/v1", false)]
     [InlineData("https://user:password@example.test/v1", false)]
     [InlineData("https://example.test/v1?token=secret", false)]
+    [InlineData("https://example.test/v1#fragment", false)]
     public void ValidatesBaseUrl(string value, bool expected)
     {
         Assert.Equal(expected, AiClient.TryParseBaseUrl(value, out var uri));

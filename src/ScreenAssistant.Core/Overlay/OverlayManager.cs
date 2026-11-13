@@ -9,12 +9,15 @@ public sealed class OverlayManager(IOverlayDispatcher dispatcher, IOverlayRender
     private bool _active;
     private bool _visible;
     private bool _closed;
+    private int _hideGeneration;
+    private bool _hideShouldRestore;
 
     public Task SetVisibleAsync(bool visible) => dispatcher.InvokeAsync(() =>
     {
         if (_closed || visible == _visible)
             return;
 
+        _hideShouldRestore = false;
         if (visible)
             renderer.Render(_state);
 
@@ -25,10 +28,14 @@ public sealed class OverlayManager(IOverlayDispatcher dispatcher, IOverlayRender
     public async Task<long> BeginAsync(string status, bool reset = false)
     {
         long id = 0;
+        var closed = false;
         await dispatcher.InvokeAsync(() =>
         {
             if (_closed)
+            {
+                closed = true;
                 return;
+            }
 
             id = ++_request;
             _active = true;
@@ -37,6 +44,8 @@ public sealed class OverlayManager(IOverlayDispatcher dispatcher, IOverlayRender
 
             Update(new(status, _lastAnswer, OverlayPhase.Loading));
         }).ConfigureAwait(false);
+        if (closed)
+            throw new InvalidOperationException("Оверлей уже закрыт.");
         return id;
     }
 
@@ -73,6 +82,43 @@ public sealed class OverlayManager(IOverlayDispatcher dispatcher, IOverlayRender
         Finish(status, error);
     });
 
+    public async Task HideForAsync(TimeSpan delay, CancellationToken token = default)
+    {
+        var generation = Interlocked.Increment(ref _hideGeneration);
+        await dispatcher.InvokeAsync(() =>
+        {
+            if (_closed)
+                return;
+
+            if (_visible)
+            {
+                _hideShouldRestore = true;
+                renderer.SetVisible(false);
+                _visible = false;
+            }
+        }).ConfigureAwait(false);
+
+        try
+        {
+            await Task.Delay(delay, token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            return;
+        }
+
+        await dispatcher.InvokeAsync(() =>
+        {
+            if (_closed || generation != Volatile.Read(ref _hideGeneration) || !_hideShouldRestore || _visible)
+                return;
+
+            _hideShouldRestore = false;
+            renderer.Render(_state);
+            renderer.SetVisible(true);
+            _visible = true;
+        }).ConfigureAwait(false);
+    }
+
     public Task ShutdownAsync() => dispatcher.InvokeAsync(() =>
     {
         if (_closed)
@@ -80,6 +126,8 @@ public sealed class OverlayManager(IOverlayDispatcher dispatcher, IOverlayRender
 
         _closed = true;
         _active = false;
+        _hideShouldRestore = false;
+        Interlocked.Increment(ref _hideGeneration);
         if (_visible)
             renderer.SetVisible(false);
         _visible = false;

@@ -1,8 +1,12 @@
 {
   "BaseUrl": "https://api.aitunnel.ru/v1",
   "Model": "claude-haiku-4.5",
-  "IntervalSeconds": 120,
-  "DurationMinutes": 50,
+  "IntervalSeconds": 30,
+  "DurationMinutes": 120,
   "SkipIdenticalFrames": true,
-  "UseStreaming": true
+  "UseStreaming": true,
+  "CropX": null,
+  "CropY": null,
+  "CropWidth": null,
+  "CropHeight": null
 }

@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ScreenAssistant.Core.AIClient;
+using ScreenAssistant.Core.Geometry;
 
 namespace ScreenAssistant.Configuration;
 
@@ -10,18 +11,39 @@ internal sealed record UserSettings
 {
     public string BaseUrl { get; init; } = AiClient.DefaultBaseUrl;
     public string Model { get; init; } = "";
-    public int IntervalSeconds { get; init; } = 120;
-    public int DurationMinutes { get; init; } = 50;
+    public int IntervalSeconds { get; init; } = 30;
+    public int DurationMinutes { get; init; } = 120;
     public bool SkipIdenticalFrames { get; init; } = true;
     public bool UseStreaming { get; init; } = true;
+    public int? CropX { get; init; }
+    public int? CropY { get; init; }
+    public int? CropWidth { get; init; }
+    public int? CropHeight { get; init; }
+
+    public CropRect? GetStoredCrop() =>
+        FrameGeometry.TryReadStored(CropX, CropY, CropWidth, CropHeight);
+
+    public CropRect? GetCropForFrame(int frameWidth, int frameHeight)
+    {
+        var stored = GetStoredCrop();
+        if (stored is null)
+            return null;
+        var normalized = FrameGeometry.NormalizeCrop(stored.Value, frameWidth, frameHeight);
+        return normalized.IsEmpty ? null : normalized;
+    }
 
     public static UserSettings Load()
     {
         if (!File.Exists(LocalFiles.Settings))
             return new();
 
-        return JsonSerializer.Deserialize<UserSettings>(File.ReadAllText(LocalFiles.Settings))
+        var loaded = JsonSerializer.Deserialize<UserSettings>(File.ReadAllText(LocalFiles.Settings))
             ?? new UserSettings();
+        return loaded with
+        {
+            IntervalSeconds = Math.Clamp(loaded.IntervalSeconds, 5, 3600),
+            DurationMinutes = Math.Clamp(loaded.DurationMinutes, 1, 720)
+        };
     }
 
     public void Save() => LocalFiles.WriteAtomically(LocalFiles.Settings,
@@ -93,7 +115,6 @@ internal static class LocalFiles
             if (File.Exists(log) && new FileInfo(log).Length >= 256 * 1024)
                 File.Move(log, log + ".previous", overwrite: true);
 
-            // Provider bodies, URLs, exception messages and headers can contain secrets.
             var cause = ex.InnerException ?? ex;
             var httpStatus = ex is AiException { Status: { } status } ? $" HTTP {(int)status}" : "";
             File.AppendAllText(log,

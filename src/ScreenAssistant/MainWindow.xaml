@@ -95,6 +95,7 @@
             </Border>
             <CheckBox x:Name="OverlayEnabled" DockPanel.Dock="Right" Content="Плавающий ответ"
                       VerticalAlignment="Center" Margin="8,0,12,0"
+                      ToolTip="Ответ поверх окон. Окно старается исключиться из захвата; если не удалось — перенесите на другой монитор."
                       Checked="OverlayToggle_Changed" Unchecked="OverlayToggle_Changed"/>
             <TextBlock Text="AI Screen Assistant" FontSize="27" FontWeight="SemiBold"/>
         </DockPanel>
@@ -149,7 +150,7 @@
                             <Button Content="Сохранить настройки" Click="Save_Click"/>
                         </StackPanel>
                         <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0"
-                                   Text="При запуске API получит тестовую картинку, затем кадры выбранного источника."/>
+                                   Text="При запуске API получит тестовую картинку, затем кадры выбранного источника. Кадры уходят на указанный HTTPS Base URL. Каталог моделей всегда загружается с публичного API AI Tunnel."/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -248,7 +249,7 @@
                                     <Slider Grid.Row="2" Grid.Column="1" Minimum="36" Maximum="72" TickFrequency="1"
                                             IsSnapToTickEnabled="True" Value="{Binding CompactHeight}"
                                             Style="{StaticResource CompactHeightStyle}" AutomationProperties.Name="Высота компактной строки"/>
-                                    <Slider Grid.Row="2" Grid.Column="1" Minimum="190" Maximum="560" TickFrequency="1"
+                                    <Slider Grid.Row="2" Grid.Column="1" Minimum="180" Maximum="560" TickFrequency="1"
                                             IsSnapToTickEnabled="True" Value="{Binding Height}"
                                             Style="{StaticResource DetailedHeightStyle}" AutomationProperties.Name="Высота многострочного окна"/>
                                     <TextBlock Grid.Row="2" Grid.Column="2" Style="{StaticResource Value}" Text="{Binding DisplayHeight, StringFormat=F0}"/>
@@ -265,8 +266,17 @@
                                             TickFrequency=".01" IsSnapToTickEnabled="True" Value="{Binding PanelOpacity}"/>
                                     <TextBlock Grid.Row="4" Grid.Column="2" Style="{StaticResource Value}" Text="{Binding PanelOpacity, StringFormat=P0}"/>
 
-                                    <Button Grid.Row="5" Grid.ColumnSpan="3" HorizontalAlignment="Left" Margin="0,7,0,0"
-                                            Content="Сбросить положение" Click="ResetOverlayPosition_Click"/>
+                                    <StackPanel Grid.Row="5" Grid.ColumnSpan="3" Margin="0,7,0,0">
+                                        <CheckBox Content="Скрывать оверлей из записи экрана"
+                                                  IsChecked="{Binding ExcludeFromCapture}" Margin="0,0,0,6"/>
+                                        <CheckBox Content="Плотный фон (без прозрачности)"
+                                                  IsChecked="{Binding SolidBackground}" Margin="0,0,0,6"
+                                                  ToolTip="Окно сразу пересоздаётся. Нужен, если исключение из захвата не срабатывает на вашем GPU."/>
+                                        <Button HorizontalAlignment="Left" Content="Сбросить положение"
+                                                Click="ResetOverlayPosition_Click"/>
+                                        <TextBlock Style="{StaticResource Hint}" Margin="0,8,0,0"
+                                                   Text="Оверлей старается не попадать в программный захват экрана. Если исключение не сработало — включите плотный фон или перенесите окно на другой монитор."/>
+                                    </StackPanel>
                                 </Grid>
                             </ScrollViewer>
                         </TabItem>
@@ -287,6 +297,8 @@
                     <TextBlock x:Name="StatusText" Text="Готово к настройке" FontWeight="SemiBold" TextWrapping="Wrap"
                                AutomationProperties.LiveSetting="Polite"/>
                     <TextBlock x:Name="StatsText" Style="{StaticResource Hint}" Margin="0,2,0,0"/>
+                    <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0" TextWrapping="Wrap"
+                               Text="Трей у часов. Крестик — в трей. Выход — из меню иконки. Хоткеи: Ctrl+Alt+M окно · Ctrl+Alt+A анализ · Ctrl+Alt+H оверлей · Ctrl+Alt+S старт/стоп · Ctrl+Alt+R область · Ctrl+Alt+Пробел паника"/>
                 </StackPanel>
             </DockPanel>
         </Border>

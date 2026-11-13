@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace ScreenAssistant.Overlay;
@@ -13,15 +14,32 @@ public partial class OverlayWindow : Window
     private const uint PositionOnly = 0x0001 | 0x0004 | 0x0010;
     private const int DisplayChanged = 0x007E;
     private const int SettingsChanged = 0x001A;
+    private const int GwlExstyle = -20;
+    private const int WsExAppWindow = 0x00040000;
+    private const int WsExToolWindow = 0x00000080;
+    private const int WsExNoActivate = 0x08000000;
     private readonly OverlayViewModel _viewModel;
     private readonly Window? _mainWindow;
     private HwndSource? _source;
     private nint _hwnd;
 
+    internal bool IsExcludedFromCapture { get; private set; }
+
     internal OverlayWindow(OverlayViewModel viewModel, Window? mainWindow)
     {
         _viewModel = viewModel;
         _mainWindow = mainWindow;
+        if (viewModel.Preferences.SolidBackground)
+        {
+            AllowsTransparency = false;
+            Background = new SolidColorBrush(Color.FromRgb(0x28, 0x28, 0x28));
+        }
+        else
+        {
+            AllowsTransparency = true;
+            Background = Brushes.Transparent;
+        }
+
         InitializeComponent();
         DataContext = viewModel;
         Width = viewModel.Width;
@@ -35,9 +53,25 @@ public partial class OverlayWindow : Window
         _hwnd = new WindowInteropHelper(this).Handle;
         _source = HwndSource.FromHwnd(_hwnd);
         _source?.AddHook(WindowMessage);
+        ApplyToolWindowStyle();
+        ApplyExclusion();
         Place(_viewModel.Preferences.X, _viewModel.Preferences.Y);
         Dispatcher.InvokeAsync(() => Place(_viewModel.Preferences.X, _viewModel.Preferences.Y),
             DispatcherPriority.Loaded);
+    }
+
+    internal void ApplyExclusion()
+    {
+        if (_hwnd == 0)
+            return;
+
+        if (_viewModel.Preferences.ExcludeFromCapture)
+            IsExcludedFromCapture = CaptureExclusion.Apply(_hwnd, true);
+        else
+        {
+            CaptureExclusion.Apply(_hwnd, false);
+            IsExcludedFromCapture = true;
+        }
     }
 
     protected override void OnClosed(EventArgs e)
@@ -66,7 +100,14 @@ public partial class OverlayWindow : Window
     private nint WindowMessage(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
     {
         if (msg is DisplayChanged or SettingsChanged)
-            Dispatcher.InvokeAsync(KeepOnScreen, DispatcherPriority.Loaded);
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                ApplyExclusion();
+                KeepOnScreen();
+            }, DispatcherPriority.Loaded);
+        }
+
         return 0;
     }
 
@@ -76,6 +117,8 @@ public partial class OverlayWindow : Window
             KeepOnScreen();
         else if (e.PropertyName == nameof(OverlayViewModel.Preferences))
             Place(null, null);
+        else if (e.PropertyName == nameof(OverlayViewModel.ExcludeFromCapture))
+            ApplyExclusion();
     }
 
     private void KeepOnScreen()
@@ -103,19 +146,25 @@ public partial class OverlayWindow : Window
         if (monitor == 0 || !GetMonitorInfo(monitor, ref info))
             return;
 
-        // Win32 rects use physical pixels. WPF scales the content and size for each monitor.
         var area = info.Work;
-        var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
+        var dpi = VisualTreeHelper.GetDpi(this);
         Width = Math.Min(_viewModel.Width, (area.Right - area.Left) / dpi.DpiScaleX);
         Height = Math.Min(_viewModel.DisplayHeight, (area.Bottom - area.Top) / dpi.DpiScaleY);
         var width = (int)Math.Ceiling(Width * dpi.DpiScaleX);
         var height = (int)Math.Ceiling(Height * dpi.DpiScaleY);
         var maxX = Math.Max(area.Left, area.Right - width);
         var maxY = Math.Max(area.Top, area.Bottom - height);
-        var targetX = restore ? x!.Value : maxX - 20;
-        var targetY = restore ? y!.Value : area.Top + 20;
+        var targetX = restore ? x!.Value : area.Left + (area.Right - area.Left - width) / 2;
+        var targetY = restore ? y!.Value : maxY - 40;
         SetWindowPos(_hwnd, 0, Math.Clamp(targetX, area.Left, maxX),
             Math.Clamp(targetY, area.Top, maxY), 0, 0, PositionOnly);
+    }
+
+    private void ApplyToolWindowStyle()
+    {
+        var style = GetWindowLong(_hwnd, GwlExstyle);
+        style = (style | WsExToolWindow | WsExNoActivate) & ~WsExAppWindow;
+        SetWindowLong(_hwnd, GwlExstyle, style);
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -150,4 +199,10 @@ public partial class OverlayWindow : Window
     [DllImport("user32.dll", ExactSpelling = true)]
     private static extern bool SetWindowPos(nint hwnd, nint insertAfter, int x, int y, int width,
         int height, uint flags);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+    private static extern int GetWindowLong(nint hwnd, int index);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
+    private static extern int SetWindowLong(nint hwnd, int index, int value);
 }

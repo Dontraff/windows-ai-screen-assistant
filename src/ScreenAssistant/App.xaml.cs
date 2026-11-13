@@ -25,12 +25,14 @@ public partial class App : Application
             preferences.Enabled, renderer.SetEnabledPreference);
         renderer.Attach(main);
         renderer.CloseRequested += (_, _) => main.DisableOverlay();
+        renderer.CaptureExclusionFailed += (_, _) => main.WarnOverlayCaptureInclusion();
         MainWindow = main;
         main.Show();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        // MainWindow awaits overlay shutdown and cancels in-flight work before Close completes.
         _http.Dispose();
         base.OnExit(e);
     }

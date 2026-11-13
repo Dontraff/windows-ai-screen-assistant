@@ -83,6 +83,41 @@ public sealed class OverlayManagerTests
         Assert.Equal("", renderer.State?.Text);
     }
 
+    [Fact]
+    public async Task BeginAfterShutdownThrows()
+    {
+        var overlay = new OverlayManager(new InlineDispatcher(), new Renderer());
+        await overlay.ShutdownAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => overlay.BeginAsync("Поздно"));
+    }
+
+    [Fact]
+    public async Task HideForRestoresVisibilityAfterDelay()
+    {
+        var renderer = new Renderer();
+        var overlay = new OverlayManager(new InlineDispatcher(), renderer);
+        await overlay.SetVisibleAsync(true);
+        var hide = overlay.HideForAsync(TimeSpan.FromMilliseconds(40));
+        Assert.Equal(new[] { true, false }, renderer.Visibility);
+        await hide.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(new[] { true, false, true }, renderer.Visibility);
+    }
+
+    [Fact]
+    public async Task HideForRepeatedCallOnlyLatestRestoreWins()
+    {
+        var renderer = new Renderer();
+        var overlay = new OverlayManager(new InlineDispatcher(), renderer);
+        await overlay.SetVisibleAsync(true);
+        var first = overlay.HideForAsync(TimeSpan.FromMilliseconds(30));
+        var second = overlay.HideForAsync(TimeSpan.FromMilliseconds(80));
+        await first.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.False(renderer.Visibility[^1]);
+        await second.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(renderer.Visibility[^1]);
+        Assert.Equal(new[] { true, false, true }, renderer.Visibility);
+    }
+
     private sealed class InlineDispatcher : IOverlayDispatcher
     {
         public Task InvokeAsync(Action action)

@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using ScreenAssistant.Core.AIClient;
+using ScreenAssistant.Core.Geometry;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
 using BitmapFrame = System.Windows.Media.Imaging.BitmapFrame;
@@ -15,17 +16,34 @@ internal sealed record CapturedImage(ImagePayload Payload, string Fingerprint, i
 internal static class FrameEncoding
 {
     private const int LongEdge = 2560;
-    private const int PngLimit = 4 * 1024 * 1024;
+    private const int PngLimit = 8 * 1024 * 1024;
 
-    public static async Task<CapturedImage> EncodeAsync(SoftwareBitmap bitmap, CancellationToken token)
+    public static Task<CapturedImage> EncodeAsync(SoftwareBitmap bitmap, CancellationToken token) =>
+        EncodeAsync(bitmap, null, token);
+
+    public static async Task<CapturedImage> EncodeAsync(SoftwareBitmap bitmap, CropRect? crop,
+        CancellationToken token)
     {
-        var scale = Math.Min(1.0, LongEdge / (double)Math.Max(bitmap.PixelWidth, bitmap.PixelHeight));
-        var width = Math.Max(1, (int)Math.Round(bitmap.PixelWidth * scale));
-        var height = Math.Max(1, (int)Math.Round(bitmap.PixelHeight * scale));
+        var bounds = crop is { } requested && !requested.IsEmpty
+            ? FrameGeometry.NormalizeCrop(requested, bitmap.PixelWidth, bitmap.PixelHeight)
+            : new CropRect(0, 0, bitmap.PixelWidth, bitmap.PixelHeight);
+        if (bounds.IsEmpty)
+            bounds = new(0, 0, bitmap.PixelWidth, bitmap.PixelHeight);
+
+        var scale = Math.Min(1.0, LongEdge / (double)Math.Max(bounds.Width, bounds.Height));
+        var width = Math.Max(1, (int)Math.Round(bounds.Width * scale));
+        var height = Math.Max(1, (int)Math.Round(bounds.Height * scale));
 
         using var stream = new InMemoryRandomAccessStream();
         var encoder = await WinRtBitmapEncoder.CreateAsync(WinRtBitmapEncoder.PngEncoderId, stream).AsTask(token);
         encoder.SetSoftwareBitmap(bitmap);
+        encoder.BitmapTransform.Bounds = new BitmapBounds
+        {
+            X = (uint)bounds.X,
+            Y = (uint)bounds.Y,
+            Width = (uint)bounds.Width,
+            Height = (uint)bounds.Height
+        };
         if (scale < 1)
         {
             encoder.BitmapTransform.ScaledWidth = (uint)width;
@@ -57,7 +75,6 @@ internal static class FrameEncoding
     public static (ImagePayload Image, string ExpectedColors) CreateVisionProbe()
     {
         var palette = new[] { ("RED", 2), ("GREEN", 1), ("BLUE", 0) };
-        // Adjacent bands must have different colors to keep every boundary visible.
         var left = RandomNumberGenerator.GetInt32(palette.Length);
         var middle = (left + RandomNumberGenerator.GetInt32(1, 3)) % palette.Length;
         var right = (middle + RandomNumberGenerator.GetInt32(1, 3)) % palette.Length;
@@ -86,7 +103,7 @@ internal static class FrameEncoding
 
     private static ImagePayload ToJpeg(byte[] png)
     {
-        var encoder = new JpegBitmapEncoder { QualityLevel = 90 };
+        var encoder = new JpegBitmapEncoder { QualityLevel = 95 };
         encoder.Frames.Add(BitmapFrame.Create(Decode(new ImagePayload("image/png", png))));
         using var output = new MemoryStream();
         encoder.Save(output);

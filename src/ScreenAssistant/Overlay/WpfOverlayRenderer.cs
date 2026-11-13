@@ -27,10 +27,12 @@ internal sealed class WpfOverlayRenderer : IOverlayRenderer
     private OverlayWindow? _window;
     private Window? _mainWindow;
     private bool _dirty;
+    private bool _solidBackground;
 
     public WpfOverlayRenderer(OverlayPreferences preferences, Action<OverlayPreferences> save)
     {
         _viewModel = new OverlayViewModel(preferences);
+        _solidBackground = preferences.SolidBackground;
         _save = save;
         _saveTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -42,32 +44,33 @@ internal sealed class WpfOverlayRenderer : IOverlayRenderer
             _dirty = true;
             _saveTimer.Stop();
             _saveTimer.Start();
+            if (_viewModel.Preferences.SolidBackground != _solidBackground && _window is not null)
+                RecreateVisibleWindow();
         };
     }
 
     public event EventHandler? CloseRequested;
+    public event EventHandler? CaptureExclusionFailed;
+
     public void Attach(MainWindow mainWindow)
     {
         _mainWindow = mainWindow;
         mainWindow.BindOverlaySettings(_viewModel);
     }
+
     public void SetEnabledPreference(bool enabled)
     {
         _viewModel.SetEnabled(enabled);
         Flush();
     }
+
     public void Render(OverlayState state) => _viewModel.Render(state);
 
     public void SetVisible(bool visible)
     {
         if (!visible)
         {
-            if (_window is { } current)
-            {
-                _window = null;
-                current.Closed -= UserClosed;
-                current.Close();
-            }
+            CloseWindow();
             Flush();
             return;
         }
@@ -75,12 +78,26 @@ internal sealed class WpfOverlayRenderer : IOverlayRenderer
         if (_window is not null)
             return;
 
+        OpenWindow();
+    }
+
+    private void RecreateVisibleWindow()
+    {
+        CloseWindow();
+        OpenWindow();
+    }
+
+    private void OpenWindow()
+    {
+        _solidBackground = _viewModel.Preferences.SolidBackground;
         var window = new OverlayWindow(_viewModel, _mainWindow);
         window.Closed += UserClosed;
         _window = window;
         try
         {
             window.Show();
+            if (_viewModel.Preferences.ExcludeFromCapture && !window.IsExcludedFromCapture)
+                CaptureExclusionFailed?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
         {
@@ -89,6 +106,16 @@ internal sealed class WpfOverlayRenderer : IOverlayRenderer
             window.Close();
             throw;
         }
+    }
+
+    private void CloseWindow()
+    {
+        if (_window is not { } current)
+            return;
+
+        _window = null;
+        current.Closed -= UserClosed;
+        current.Close();
     }
 
     public void Flush()

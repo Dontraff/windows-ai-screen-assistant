@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Windows;
 using ScreenAssistant.Configuration;
 
 namespace ScreenAssistant.Overlay;
@@ -8,15 +9,29 @@ internal sealed record OverlayPreferences
 {
     public bool Enabled { get; init; }
     public bool Compact { get; init; } = true;
+    public bool ExcludeFromCapture { get; init; } = true;
+    public bool SolidBackground { get; init; }
     public double CompactHeight { get; init; } = 38;
-    public double Width { get; init; } = 360;
-    public double Height { get; init; } = 250;
+    public double Width { get; init; } = DefaultWidth();
+    public double Height { get; init; } = 180;
     public double FontSize { get; init; } = 16;
     public double PanelOpacity { get; init; } = .94;
     public int? X { get; init; }
     public int? Y { get; init; }
 
     private static string PathName => Path.Combine(LocalFiles.DirectoryPath, "overlay.json");
+
+    private static double DefaultWidth()
+    {
+        try
+        {
+            return Math.Clamp(SystemParameters.WorkArea.Width * 0.6, 240, 1000);
+        }
+        catch
+        {
+            return 360;
+        }
+    }
 
     public static OverlayPreferences Load()
     {
@@ -29,7 +44,7 @@ internal sealed record OverlayPreferences
                 {
                     Width = Math.Clamp(settings.Width, 240, 1000),
                     CompactHeight = Math.Clamp(settings.CompactHeight, 36, 72),
-                    Height = Math.Clamp(settings.Height, 190, 560),
+                    Height = Math.Clamp(settings.Height, 180, 560),
                     FontSize = Math.Clamp(settings.FontSize, 12, 26),
                     PanelOpacity = Math.Clamp(settings.PanelOpacity, 0, 1)
                 };

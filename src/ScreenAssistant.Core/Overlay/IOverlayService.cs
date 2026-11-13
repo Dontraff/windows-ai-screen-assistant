@@ -12,6 +12,7 @@ public interface IOverlayService
     Task CompleteAsync(long requestId, string text);
     Task FailAsync(long requestId, string status);
     Task EndAsync(string status, bool error = false);
+    Task HideForAsync(TimeSpan delay, CancellationToken token = default);
     Task ShutdownAsync();
 }
 
