@@ -118,6 +118,21 @@ public sealed class OverlayManagerTests
         Assert.Equal(new[] { true, false, true }, renderer.Visibility);
     }
 
+    [Fact]
+    public async Task ClickThroughAppliesAndReappliesWhenShownAgain()
+    {
+        var renderer = new Renderer();
+        var overlay = new OverlayManager(new InlineDispatcher(), renderer);
+        await overlay.SetClickThroughAsync(true);
+        Assert.Equal(new[] { true }, renderer.ClickThrough);
+        await overlay.SetVisibleAsync(true);
+        Assert.Equal(new[] { true, true }, renderer.ClickThrough);
+        await overlay.SetClickThroughAsync(false);
+        Assert.Equal(new[] { true, true, false }, renderer.ClickThrough);
+        await overlay.ShutdownAsync();
+        Assert.Equal(new[] { true, true, false, false }, renderer.ClickThrough);
+    }
+
     private sealed class InlineDispatcher : IOverlayDispatcher
     {
         public Task InvokeAsync(Action action)
@@ -130,8 +145,10 @@ public sealed class OverlayManagerTests
     private sealed class Renderer : IOverlayRenderer
     {
         public List<bool> Visibility { get; } = [];
+        public List<bool> ClickThrough { get; } = [];
         public OverlayState? State { get; private set; }
         public void Render(OverlayState state) => State = state;
         public void SetVisible(bool visible) => Visibility.Add(visible);
+        public void SetClickThrough(bool enabled) => ClickThrough.Add(enabled);
     }
 }

@@ -492,6 +492,7 @@ public partial class MainWindow : Window
             await capture.StartAsync(source, token);
             _capture = capture;
             _sessionActive = true;
+            await _overlay.SetClickThroughAsync(true);
             try
             {
                 var end = await _scheduler.RunAsync(
@@ -509,6 +510,8 @@ public partial class MainWindow : Window
             {
                 _sessionActive = false;
                 _capture = null;
+                try { await _overlay.SetClickThroughAsync(false); }
+                catch (Exception ex) { LocalFiles.Log("overlay-click-through", ex); }
             }
         }, usesSource: true);
     }

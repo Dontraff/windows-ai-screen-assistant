@@ -7,6 +7,7 @@ public sealed record OverlayState(string Status, string Text, OverlayPhase Phase
 public interface IOverlayService
 {
     Task SetVisibleAsync(bool visible);
+    Task SetClickThroughAsync(bool enabled);
     Task<long> BeginAsync(string status, bool reset = false);
     Task AppendAsync(long requestId, string delta);
     Task CompleteAsync(long requestId, string text);
@@ -20,6 +21,7 @@ public interface IOverlayRenderer
 {
     void Render(OverlayState state);
     void SetVisible(bool visible);
+    void SetClickThrough(bool enabled);
 }
 
 public interface IOverlayDispatcher

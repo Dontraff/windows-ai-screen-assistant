@@ -28,6 +28,7 @@ internal sealed class WpfOverlayRenderer : IOverlayRenderer
     private Window? _mainWindow;
     private bool _dirty;
     private bool _solidBackground;
+    private bool _clickThrough;
 
     public WpfOverlayRenderer(OverlayPreferences preferences, Action<OverlayPreferences> save)
     {
@@ -66,6 +67,12 @@ internal sealed class WpfOverlayRenderer : IOverlayRenderer
 
     public void Render(OverlayState state) => _viewModel.Render(state);
 
+    public void SetClickThrough(bool enabled)
+    {
+        _clickThrough = enabled;
+        _window?.SetClickThrough(enabled);
+    }
+
     public void SetVisible(bool visible)
     {
         if (!visible)
@@ -96,6 +103,8 @@ internal sealed class WpfOverlayRenderer : IOverlayRenderer
         try
         {
             window.Show();
+            if (_clickThrough)
+                window.SetClickThrough(true);
             if (_viewModel.Preferences.ExcludeFromCapture && !window.IsExcludedFromCapture)
                 CaptureExclusionFailed?.Invoke(this, EventArgs.Empty);
         }

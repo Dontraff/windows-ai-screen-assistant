@@ -18,10 +18,12 @@ public partial class OverlayWindow : Window
     private const int WsExAppWindow = 0x00040000;
     private const int WsExToolWindow = 0x00000080;
     private const int WsExNoActivate = 0x08000000;
+    private const int WsExTransparent = 0x00000020;
     private readonly OverlayViewModel _viewModel;
     private readonly Window? _mainWindow;
     private HwndSource? _source;
     private nint _hwnd;
+    private bool _clickThrough;
 
     internal bool IsExcludedFromCapture { get; private set; }
 
@@ -53,11 +55,21 @@ public partial class OverlayWindow : Window
         _hwnd = new WindowInteropHelper(this).Handle;
         _source = HwndSource.FromHwnd(_hwnd);
         _source?.AddHook(WindowMessage);
-        ApplyToolWindowStyle();
+        ApplyExtendedStyles();
         ApplyExclusion();
         Place(_viewModel.Preferences.X, _viewModel.Preferences.Y);
         Dispatcher.InvokeAsync(() => Place(_viewModel.Preferences.X, _viewModel.Preferences.Y),
             DispatcherPriority.Loaded);
+    }
+
+    internal void SetClickThrough(bool enabled)
+    {
+        if (_clickThrough == enabled)
+            return;
+
+        _clickThrough = enabled;
+        if (_hwnd != 0)
+            ApplyExtendedStyles();
     }
 
     internal void ApplyExclusion()
@@ -160,10 +172,17 @@ public partial class OverlayWindow : Window
             Math.Clamp(targetY, area.Top, maxY), 0, 0, PositionOnly);
     }
 
-    private void ApplyToolWindowStyle()
+    private void ApplyExtendedStyles()
     {
+        if (_hwnd == 0)
+            return;
+
         var style = GetWindowLong(_hwnd, GwlExstyle);
         style = (style | WsExToolWindow | WsExNoActivate) & ~WsExAppWindow;
+        if (_clickThrough)
+            style |= WsExTransparent;
+        else
+            style &= ~WsExTransparent;
         SetWindowLong(_hwnd, GwlExstyle, style);
     }
 

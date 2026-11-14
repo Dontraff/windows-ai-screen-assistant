@@ -8,6 +8,7 @@ public sealed class OverlayManager(IOverlayDispatcher dispatcher, IOverlayRender
     private long _request;
     private bool _active;
     private bool _visible;
+    private bool _clickThrough;
     private bool _closed;
     private int _hideGeneration;
     private bool _hideShouldRestore;
@@ -23,6 +24,17 @@ public sealed class OverlayManager(IOverlayDispatcher dispatcher, IOverlayRender
 
         renderer.SetVisible(visible);
         _visible = visible;
+        if (visible && _clickThrough)
+            renderer.SetClickThrough(true);
+    });
+
+    public Task SetClickThroughAsync(bool enabled) => dispatcher.InvokeAsync(() =>
+    {
+        if (_closed || enabled == _clickThrough)
+            return;
+
+        _clickThrough = enabled;
+        renderer.SetClickThrough(enabled);
     });
 
     public async Task<long> BeginAsync(string status, bool reset = false)
@@ -126,8 +138,10 @@ public sealed class OverlayManager(IOverlayDispatcher dispatcher, IOverlayRender
 
         _closed = true;
         _active = false;
+        _clickThrough = false;
         _hideShouldRestore = false;
         Interlocked.Increment(ref _hideGeneration);
+        renderer.SetClickThrough(false);
         if (_visible)
             renderer.SetVisible(false);
         _visible = false;
